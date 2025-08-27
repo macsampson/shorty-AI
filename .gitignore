@@ -1,0 +1,29 @@
+# ignore ollama models
+ollama/models
+
+# ignore sdxl-server model
+sdxl-server/model/sdxl
+
+# ignore tortoise-tts models
+tortoise-tts/tortoise/models/large
+
+# ignore libraries
+*/node_modules
+
+# ignore generated content
+generations
+testing
+*/images
+
+# ignore caches
+**/__pycache__
+
+# ignore venv related files
+*/venv
+*/.venv
+
+# any model files
+models
+
+# env
+.env

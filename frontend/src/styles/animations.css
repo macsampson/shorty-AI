@@ -1,0 +1,46 @@
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.video-ready {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.spinner {
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top: 3px solid #4a90e2;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+.refresh-button.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.thumbnail-spinner {
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top: 2px solid #4a90e2;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
