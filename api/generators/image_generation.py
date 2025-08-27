@@ -1,69 +1,50 @@
-import aiohttp
-import base64
 from fastapi import HTTPException
-from PIL import Image
-from io import BytesIO
+import aiohttp
 import os
 import datetime
-import asyncio
+from openai import AsyncOpenAI
+from config import settings
 
-# IMAGE_GEN_URL, MODEL_NAME = "http://sdxl:8001", "sdxl"
-IMAGE_GEN_URL, MODEL_NAME = "http://flux:8008", "flux"
+# Initialize OpenAI client for DALL-E
+client = AsyncOpenAI(api_key=settings.openai_api_key)
 
 async def generate_image(request, output_dir):
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.post(
-                f"{IMAGE_GEN_URL}/generate_image",
-                json={
-                    "prompt": request.prompt,
-                    "num_inference_steps": request.num_inference_steps,
-                    "guidance_scale": request.guidance_scale,
-                    "max_sequence_length": request.max_sequence_length,
-                },
-                timeout=300
-            ) as response:
-                response_data = await response.json()
-
-            img_str = response_data.get("image")
-            if img_str:
-                img_data = base64.b64decode(img_str)
-                image = Image.open(BytesIO(img_data))
-                now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                image_path = os.path.join(output_dir, f"{MODEL_NAME}_{now}.png")
-                os.makedirs(os.path.dirname(image_path), exist_ok=True)
-                image.save(image_path)
+    try:
+        # Generate image using DALL-E
+        response = await client.images.generate(
+            model="dall-e-3",
+            prompt=request.prompt,
+            size="1024x1792",  # Portrait orientation for vertical videos
+            quality="standard",
+            n=1
+        )
+        
+        image_url = response.data[0].url
+        
+        # Download the image
+        async with aiohttp.ClientSession() as session:
+            async with session.get(image_url) as img_response:
+                if img_response.status != 200:
+                    raise HTTPException(status_code=500, detail="Failed to download generated image")
                 
-                return image_path
-            else:
-                raise HTTPException(status_code=500, detail=f"Error generating {MODEL_NAME} image.")
+                # Generate filename and save
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                image_path = os.path.join(output_dir, f"dalle_{timestamp}.png")
+                os.makedirs(os.path.dirname(image_path), exist_ok=True)
+                
+                with open(image_path, "wb") as f:
+                    async for chunk in img_response.content.iter_chunked(8192):
+                        f.write(chunk)
+        
+        return image_path
 
-        except asyncio.TimeoutError:
-            raise HTTPException(status_code=500, detail=f"Request to {MODEL_NAME} model timed out.")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating image with DALL-E: {str(e)}")
 
+# DALL-E doesn't require model unloading
 async def unload_image_model():
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.post(
-                f"{IMAGE_GEN_URL}/unload_model", 
-                timeout=30
-            ) as response:
-                if response.status != 200:
-                    print(f"Warning: Failed to unload {MODEL_NAME} model. Status: {response.status}")
-                    try:
-                        error_content = await response.text()
-                        print(f"Error response: {error_content}")
-                    except:
-                        pass
-                else:
-                    print(f"{MODEL_NAME} model unloaded successfully")
-                await response.read()
-        except asyncio.TimeoutError:
-            print(f"Timeout while trying to unload {MODEL_NAME} model")
-        except Exception as e:
-            print(f"Error unloading {MODEL_NAME} model: {str(e)}")
+    print("DALL-E API doesn't require model unloading - operation skipped")
+    pass
 
 # async def generate_scene_image(scene, script_folder, output_dir):
 #     prompt = scene['prompt']

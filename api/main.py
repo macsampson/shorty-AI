@@ -31,12 +31,9 @@ app = FastAPI()
 # Variables that will be exposed to the frontend
 SCENE_DURATION = 5 # Default duration for the video in seconds
 
-LLAMA_URL = "http://llama:8080"
-SDXL_URL = "http://sdxl:8001"
-OLLAMA_URL = "http://ollama:11434"
-TORTOISE_URL = "http://tortoise:8002"  # Adjust this URL to match your Tortoise container's address
+# External API services - no local URLs needed
 MAX_RETRIES = 3 # Maximum number of retries to generate a valid JSON object
-VOICE = "train_atkins"
+VOICE = "pNInz6obpgDQGcFmaJgB"  # Default ElevenLabs voice ID
 # Define the path for the generated images
 # GENERATED_IMAGES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "generations")
 GENERATED_IMAGES_DIR = "/app/generations/images"
@@ -57,27 +54,23 @@ CAPTION_STYLES = ["modern", "classic", "neon", "minimal"]
 # Default number of scenes
 DEFAULT_NUM_SCENES = 5
 
-# Available voices
-AVAILABLE_VOICES = [
-    "train_atkins",
-    "train_daws",
-    "train_dotrice",
-    "train_dreams",
-    "train_empire",
-    "train_grace",
-    "train_kennard",
-    "train_lescault",
-    "train_mouse",
-    "train_sweetie",
-    "train_weaver"
-]
+# Available ElevenLabs voices (voice_id: name)
+AVAILABLE_VOICES = {
+    "pNInz6obpgDQGcFmaJgB": "Adam",
+    "21m00Tcm4TlvDq8ikWAM": "Rachel",
+    "AZnzlk1XvdvUeBnXmlld": "Domi", 
+    "EXAVITQu4vr4xnSDxMaL": "Bella",
+    "MF3mGyEYCl7XYWbV9V6O": "Elli",
+    "TxGEqnHWrfWFTfGW9XjX": "Josh",
+    "VR6AewLTigWG4xSOukaG": "Arnold",
+    "pqHfZKP75CvOlQylNhV4": "Bill",
+    "yoZ06aMxZJJ28mfd3POQ": "Sam",
+    "29vD33N1CtxCmqQRPOHJ": "Drew"
+}
 
-# TTS generation presets
+# TTS generation presets (simplified for ElevenLabs)
 TTS_PRESETS = [
-    "ultra_fast",
-    "fast",
-    "standard",
-    "high_quality"
+    "standard"
 ]
 
 class CaptionSettings(BaseModel):
@@ -93,8 +86,8 @@ class GenerationSettings(BaseModel):
     scene_duration: int = Field(default=SCENE_DURATION, ge=3, le=15, description="Target duration for each scene in seconds")
     
     # Voice settings
-    voice: str = Field(default=VOICE, description="Voice to use for text-to-speech")
-    tts_preset: str = Field(default="ultra_fast", description="Quality preset for text-to-speech generation")
+    voice: str = Field(default=VOICE, description="ElevenLabs voice ID to use for text-to-speech")
+    tts_preset: str = Field(default="standard", description="Quality preset for text-to-speech generation")
     
     # Caption settings
     caption_words_per_line: int = Field(default=CAPTION_WORDS_PER_LINE, ge=1, le=10, description="Number of words per line in captions")
@@ -1008,7 +1001,7 @@ async def get_settings():
 @app.get("/get_available_voices")
 async def get_available_voices():
     """
-    Get the list of available voices for text-to-speech.
+    Get the list of available ElevenLabs voices for text-to-speech.
     """
     return {
         "voices": AVAILABLE_VOICES

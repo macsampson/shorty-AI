@@ -10,3 +10,5 @@ ffmpeg
 aeneas
 stable-ts
 torch
+openai
+pydantic-settings
