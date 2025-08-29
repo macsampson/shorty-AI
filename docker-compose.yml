@@ -1,0 +1,173 @@
+# version: "3.8"
+
+services:
+  central:
+    build: ./api
+    container_name: central
+    ports:
+      - "8000:8000"
+    depends_on:
+      # - sdxl
+      # - flux
+      - ollama
+      - common-base
+    volumes:
+      - ./generations:/app/generations
+      - ./api:/app
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - central
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true
+      - FAST_REFRESH=true
+      - CHOKIDAR_USEPOLLING=true
+      - WDS_SOCKET_MAX_RECONNECT_ATTEMPTS=10
+      - NODE_OPTIONS=--max-old-space-size=2048
+
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.0"
+
+  # This is the common base image that sdxl and tortoise-tts services will use
+  common-base:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    image: common-base:latest
+    # This service won't actually run, so you can omit the rest.
+
+  ollama:
+    build:
+      context: ./ollama
+    container_name: ollama
+    entrypoint: ["/usr/bin/bash", "/pull-llama3.sh"]
+    volumes:
+      - ./ollama/models:/root/.ollama
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    runtime: nvidia
+
+  sdxl:
+    build:
+      context: ./sdxl-server
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: common-base:latest
+    container_name: sdxl
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./sdxl-server:/app
+      - ./sdxl-server/model/sdxl:/app/model/sdxl
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # TODO: Remove this before production
+      - APP_ENV=development
+    runtime: nvidia
+    depends_on:
+      - common-base
+
+  flux:
+    build:
+      context: ./flux
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: common-base:latest
+    container_name: flux
+    ports:
+      - "8008:8008"
+    volumes:
+      - ./flux:/app
+      - ./flux/models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      # TODO: Remove this before production
+      - APP_ENV=development
+    runtime: nvidia
+    depends_on:
+      - common-base
+
+  tortoise:
+    build:
+      context: ./tortoise-tts
+      dockerfile: Dockerfile
+    container_name: tortoise
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./tortoise-tts:/app/tortoise-tts
+      - ./generations/speech:/app/generations/speech
+      - ./tortoise-tts/tortoise/models/large:/app/tortoise-tts/tortoise/models/large
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    runtime: nvidia
+    depends_on:
+      - common-base
+
+  # coqui:
+  #   build:
+  #     context: ./coqui-tts
+  #   container_name: coqui
+  #   ports:
+  #     - "8003:8003"
+  #   volumes:
+  #     - ./coqui-tts:/app
+  #     - ./generations/audio:/app/generations/audio
+  #     - ./coqui-tts/models:/root/.local/share/tts/
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - capabilities: [gpu]
+  #   environment:
+  #     - NVIDIA_VISIBLE_DEVICES=all
+  #     - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+  #   runtime: nvidia
+  #   depends_on:
+  #     - common-base
+
+networks:
+  default:
+    name: shorty-ai
+
+volumes:
+  # generations:
+  ollama:

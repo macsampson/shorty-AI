@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles that extend Tailwind can be added below */
+
+@layer components {
+  /* Spinner components */
+  .spinner {
+    @apply border border-gray-200 rounded-full border-t-primary w-[30px] h-[30px] animate-spin mx-auto my-5;
+  }
+
+  .thumbnail-spinner {
+    @apply border-2 border-gray-200 rounded-full border-t-primary w-5 h-5 animate-spin;
+  }
+
+  /* Video components */
+  .video-ready {
+    @apply animate-fadeIn;
+  }
+
+  /* Library components */
+  .refresh-button.spinning {
+    @apply animate-spin;
+  }
+
+  .generation-card {
+    @apply relative bg-white rounded-lg overflow-hidden shadow-md transition-all cursor-pointer hover:translate-y-[-5px] hover:shadow-lg;
+  }
+
+  .generation-card.selected {
+    @apply border-2 border-primary;
+  }
+
+  .new-badge {
+    @apply absolute top-2 left-2 bg-danger text-white text-xs font-bold py-0.5 px-2 rounded animate-pulse;
+  }
+
+  /* Settings components */
+  .settings-overlay {
+    @apply absolute inset-0 bg-black/50 backdrop-blur-sm;
+  }
+
+  .settings-content {
+    @apply relative bg-white rounded-settings p-8 w-[90%] max-w-[600px] max-h-[90vh] overflow-y-auto shadow-settings;
+  }
+
+  /* Status indicators */
+  .status-complete {
+    @apply bg-success;
+  }
+
+  .status-processing {
+    @apply bg-warning animate-pulse;
+  }
+}
