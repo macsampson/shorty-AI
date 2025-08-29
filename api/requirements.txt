@@ -1,6 +1,6 @@
 botocore
 pathspec==0.12.1
-urllib3<1.27
+urllib3<2.6
 wcwidth==0.2.6
 fastapi[all]
 uvicorn
