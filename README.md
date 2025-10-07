@@ -1,6 +1,6 @@
 # Shorty AI
 
-![](https://github.com/macsampson/ai-shorts/blob/main/frontend/public/shorty_example.gif)
+![Demo](https://github.com/macsampson/ai-shorts/blob/main/frontend/public/shorty_example.gif)
 
 AI-powered video generation from text prompts using OpenAI, ElevenLabs, and DALL-E APIs.
 
