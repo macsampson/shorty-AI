@@ -2,4 +2,10 @@
 
 ![Demo](https://github.com/macsampson/ai-shorts/blob/main/frontend/public/shorty_example.gif)
 
-AI-powered video generation from text prompts using Llama 3, Stable Diffusion XL, Tortoise TTS and composited with ffmpeg.
+AI generated short-form videos from text prompts, developed with the intention of using self-hosted models.
+
+- Llama 3 for script generation
+- Stable Diffusion XL for images
+- Tortoise TTS for voiceover
+- ffmpeg for compositing
+- React frontend
