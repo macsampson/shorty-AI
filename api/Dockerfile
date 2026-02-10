@@ -26,17 +26,19 @@ pip install --no-cache-dir -r requirements.txt
 # Output directory for generated images
 RUN mkdir -p /app/generations
 
-# Verify ImageMagick policy.xml exists, then modify it and check if successful
-RUN if [ -f /etc/ImageMagick-6/policy.xml ]; then \
-        sed -i 's|<policy domain="path" rights="none" pattern="@\*"/>|<policy domain="path" rights="read,write" pattern="@*"/>|g' /etc/ImageMagick-6/policy.xml && \
-        if grep -q '<policy domain="path" rights="read,write" pattern="@\*"/>' /etc/ImageMagick-6/policy.xml; then \
-            echo "ImageMagick policy.xml successfully modified"; \
-        else \
-            echo "Failed to modify ImageMagick policy.xml" && exit 1; \
-        fi; \
-    else \
-        echo "ImageMagick policy.xml not found" && exit 1; \
-    fi
+# Find and modify ImageMagick policy.xml
+# RUN POLICY_FILE=$(find /etc -name policy.xml 2>/dev/null | head -1) && \
+#     if [ -f "$POLICY_FILE" ]; then \
+#         echo "Found ImageMagick policy.xml at: $POLICY_FILE" && \
+#         sed -i 's|<policy domain="path" rights="none" pattern="@\*"/>|<policy domain="path" rights="read,write" pattern="@*"/>|g' "$POLICY_FILE" && \
+#         if grep -q '<policy domain="path" rights="read,write" pattern="@\*"/>' "$POLICY_FILE"; then \
+#             echo "ImageMagick policy.xml successfully modified"; \
+#         else \
+#             echo "Failed to modify ImageMagick policy.xml" && exit 1; \
+#         fi; \
+#     else \
+#         echo "ImageMagick policy.xml not found in /etc" && exit 1; \
+#     fi
 
 
 COPY . .

@@ -15,13 +15,23 @@ import moviepy.editor as mp
 
 from urllib.parse import unquote
 from pathlib import Path
-from schemas.generate_image_request import GenerateImageRequest
-from schemas.generate_text_request import GenerateTextRequest
-from schemas.generate_speech_request import GenerateSpeechRequest
+from api.generators.factory import GeneratorFactory
+from api.models import (
+    GenerateTextRequest, 
+    GenerateSpeechRequest, 
+    GenerateImageRequest,
+    VideoGenerationStatus
+)
+from api.utils import (
+    sanitize_filename,
+    get_audio_duration, 
+    format_timecode,
+    find_matching_brace
+)
 
-from generators.image_generation import generate_image, unload_image_model
-from generators.script_generation import generate_script, unload_llama, generate_scenes, generate_prompts, split_scenes
-from generators.speech_generation import generate_speech, unload_tortoise  
+# Import the settings from config
+from config import settings
+
 from generators.caption_overlay import generate_forced_alignment_map, add_word_captions, _apply_effects, format_aeneas_timestamps, add_phrase_captions_with_highlighting, create_advanced_captions
 from generators.subtitle_creator import srt_create
 from pydantic import BaseModel, Field
@@ -166,10 +176,9 @@ mount_directories()
 # Generate script endpoint
 @app.post("/generate_script")
 async def generate_script_endpoint(request: GenerateTextRequest, output_dir: str = GENERATED_SCRIPTS_DIR):
-    response = await generate_scenes(request, output_dir)
-    # TODO: Only do this in development
-    await unload_llama()
-    return response
+    generator = GeneratorFactory.get_script_generator()
+    script_data = await generator.generate_script(request.prompt)
+    return script_data
 
 @app.post("/generate_scenes_and_prompts")
 async def generate_scenes_and_prompts_endpoint(request: GenerateTextRequest, output_dir: str = GENERATED_SCRIPTS_DIR, num_scenes: int = None):
@@ -177,37 +186,28 @@ async def generate_scenes_and_prompts_endpoint(request: GenerateTextRequest, out
     if num_scenes is None:
         num_scenes = DEFAULT_NUM_SCENES
     
-    # Generate scenes
-    response = await generate_scenes(request, output_dir, num_scenes)
-    script = response.body.decode("utf-8")
-    script_data = json.loads(script)
-
-    # Generate prompts
-    prompts_response = await generate_prompts(script_data, output_dir)
-    prompts_data = json.loads(prompts_response.body)
+    generator = GeneratorFactory.get_script_generator()
+    script_data = await generator.generate_scenes_and_prompts(request.prompt, num_scenes)
 
     return {
         "script": script_data,
-        "prompts": prompts_data
+        "prompts": [] # Backward compatibility, prompts are inside script_data['scenes']
     }
 
 # ------------ SPEECH GENERATION ------------
 @app.post("/generate_speech")
 async def generate_speech_endpoint(request: GenerateSpeechRequest, output_dir: str):
-    response = await generate_speech(request, output_dir)
-    # TODO: Only do this in development
-    await unload_tortoise()
-    return response
-
+    generator = GeneratorFactory.get_voice_generator()
+    file_path = await generator.generate_speech(request.text, request.voice, output_dir)
+    return [file_path] # Return list for compatibility
 
 
 # ------------ IMAGE GENERATION ------------
 @app.post("/generate_image")
 async def generate_image_endpoint(request: GenerateImageRequest, output_dir: str):
-    response = await generate_image(request, output_dir)
-    # TODO: Only do this in development
-    await unload_image_model()
-    return response
+    generator = GeneratorFactory.get_image_generator()
+    file_path = await generator.generate_image(request.prompt, output_dir)
+    return file_path
 
 
 
@@ -217,121 +217,80 @@ async def generate_image_endpoint(request: GenerateImageRequest, output_dir: str
 @app.post("/generate_video")
 async def generate_video(request: GenerateTextRequest):
     start_time = datetime.datetime.now()
+    
+    script_generator = GeneratorFactory.get_script_generator()
+    image_generator = GeneratorFactory.get_image_generator()
+    voice_generator = GeneratorFactory.get_voice_generator()
 
-    # Generate script
-    response = await generate_scenes(request, GENERATED_SCRIPTS_DIR, current_settings.num_scenes)
-    script = response.body.decode("utf-8")
-    script_data = json.loads(script)
-
-    # Split the scenes into smaller scenes
-    script_data = await split_scenes(script_data)
+    # Generate script and prompts
+    script_data = await script_generator.generate_scenes_and_prompts(request.prompt, current_settings.num_scenes)
 
     print("Script data: ", script_data)
 
     current_datetime = datetime.datetime.now().strftime("%Y_%m_%d_%H-%M-%S")
-    prep_folder = f"{current_datetime}_{sanitize_filename(script_data['title'])}"
-
-    # Generate image prompts
-    prompts_response = await generate_prompts(script_data, GENERATED_SCRIPTS_DIR)
-    prompts_data = json.loads(prompts_response.body)
+    prep_folder = f"{current_datetime}_{sanitize_filename(script_data.get('title', 'Unknown'))}"
     
-    actual_prompts_list = prompts_data.get('prompts', [])
-    num_split_scenes = len(script_data.get('scenes', [])) # Get length of scenes list safely
-    num_actual_prompts = len(actual_prompts_list)
+    # Prepare scenes list
+    scenes = script_data.get('scenes', [])
+    if not scenes:
+         raise HTTPException(status_code=500, detail="No scenes generated")
 
-    if num_actual_prompts < num_split_scenes:
-        print(f"Warning: LLM generated {num_actual_prompts} prompts for {num_split_scenes} split scenes. Adjusting prompt list.")
-        if actual_prompts_list:  # If there's at least one prompt to use as a template
-            last_prompt_detail = actual_prompts_list[-1]
-            missing_prompt_text = last_prompt_detail.get('prompt', "A descriptive visual for this scene.")
-            for i in range(num_split_scenes - num_actual_prompts):
-                actual_prompts_list.append({'scene_number': num_actual_prompts + i + 1, 'prompt': missing_prompt_text})
-        elif num_split_scenes > 0:  # No prompts generated, but scenes exist
-            print("Error: No prompts generated by LLM. Using generic prompts for all scenes.")
-            generic_prompt_text = "A general visual representation for the scene."
-            actual_prompts_list = [] # Ensure it's empty before repopulating
-            for i in range(num_split_scenes):
-                 actual_prompts_list.append({'scene_number': i + 1, 'prompt': f"{generic_prompt_text} (Scene {i+1})"})
-        # If num_split_scenes is 0, actual_prompts_list will remain empty, which is fine.
-        prompts_data['prompts'] = actual_prompts_list # Update prompts_data if it's referenced later directly
-
-    elif num_actual_prompts > num_split_scenes:
-        print(f"Warning: LLM generated {num_actual_prompts} prompts, more than {num_split_scenes} split scenes. Truncating prompts list.")
-        actual_prompts_list = actual_prompts_list[:num_split_scenes]
-        prompts_data['prompts'] = actual_prompts_list # Update prompts_data
-
-    # TODO: Only do this in development
-    await unload_llama()
-
-  
-    # Generate image for each scene
+    # Generate images
     image_paths = []
     image_prep_folder = os.path.join(GENERATED_IMAGES_DIR, prep_folder)
     os.makedirs(image_prep_folder, exist_ok=True)
 
-    if not actual_prompts_list and num_split_scenes > 0:
-        # This case should have been handled by the padding logic above.
-        # If it's reached, it implies an issue, or num_split_scenes was 0 and now actual_prompts_list is also empty.
-        # If num_split_scenes > 0 and list is empty, it's an error state.
-        raise HTTPException(status_code=500, detail=f"Prompt list is unexpectedly empty for {num_split_scenes} scenes after adjustment logic.")
-    
-    for prompt_item in actual_prompts_list: # Iterate using the adjusted list
-        # Ensure prompt_item is a dict and has 'prompt' key
-        if not isinstance(prompt_item, dict) or 'prompt' not in prompt_item:
-            print(f"Warning: Invalid prompt item encountered: {prompt_item}. Using a default prompt.")
-            prompt_text = "Default fallback image prompt due to invalid item."
-        else:
-            prompt_text = prompt_item['prompt']
-            
-        image_request = GenerateImageRequest(prompt=prompt_text)
-        image_path = await generate_image(image_request, image_prep_folder)
-        image_paths.append(image_path)
+    for i, scene in enumerate(scenes):
+        prompt = scene.get('prompt', f"Scene {i+1}")
+        try:
+            image_path = await image_generator.generate_image(prompt, image_prep_folder)
+            image_paths.append(image_path)
+        except Exception as e:
+            print(f"Error generating image for scene {i+1}: {e}")
+            # Use placeholder or skip? skipping will break alignment
+            # Ideally create a black image or fail
+            raise e
 
-    # TODO: Only do this in development
-    await unload_image_model()
+    print("DEBUG: Image generation complete. Starting speech generation...") 
 
-    print("DEBUG: Image generation complete. Starting speech generation loop...") # DEBUG
   
     # Generate speech for each scene
     audio_paths = []
-    # Ensure script_data['scenes'] is used here, which actual_prompts_list was aligned to
-    for i, scene in enumerate(script_data.get('scenes', [])): # DEBUG: Added enumerate
-        print(f"DEBUG: Processing scene {i+1}/{len(script_data.get('scenes', []))} for speech generation.") # DEBUG
-        # construct a GenerateSpeechRequest object
-        speech_request = GenerateSpeechRequest(
-            text=scene.get('script', "Missing script."), # Safe access to script text
-            voice=current_settings.voice, 
-            preset=current_settings.tts_preset, 
-            candidates=1, 
-            cvvp_amount=0.0
-        )
-        print(f"DEBUG: Calling generate_speech for scene {i+1}...") # DEBUG
-        audio_path = await generate_speech(speech_request, GENERATED_SPEECH_DIR)
-        print(f"DEBUG: generate_speech for scene {i+1} returned: {audio_path}") # DEBUG
-
-        audio_prep_folder = os.path.join(GENERATED_SPEECH_DIR, prep_folder)
-        os.makedirs(audio_prep_folder, exist_ok=True)
-        # Ensure scene_number is safely accessed
-        scene_number = scene.get('scene_number', f'unknown_scene_{i+1}') # DEBUG: improved fallback
-        audio_filename = f"scene_{scene_number}.wav"
-        destination_audio_path = os.path.join(audio_prep_folder, audio_filename)
+    
+    for i, scene in enumerate(scenes): 
+        print(f"DEBUG: Processing scene {i+1}/{len(scenes)} for speech generation.")
         
-        if audio_path and isinstance(audio_path, list) and len(audio_path) > 0:
-            source_audio_path = audio_path[0]
-            print(f"DEBUG: Moving audio for scene {i+1} from {source_audio_path} to {destination_audio_path}") # DEBUG
-            shutil.move(source_audio_path, destination_audio_path)
-            audio_paths.append(destination_audio_path)
-            print(f"DEBUG: Audio for scene {i+1} moved and appended.") # DEBUG
-        else:
-            print(f"Warning: Could not generate or find audio for scene {scene_number}.")
-            # Potentially add a placeholder silent audio or handle error
+        text = scene.get('script', "Missing script.")
+        
+        print(f"DEBUG: Calling generate_speech for scene {i+1}...")
+        try:
+            # New generator returns a single string path
+            audio_path = await voice_generator.generate_speech(text, current_settings.voice, GENERATED_SPEECH_DIR)
+            print(f"DEBUG: generate_speech for scene {i+1} returned: {audio_path}")
+
+            audio_prep_folder = os.path.join(GENERATED_SPEECH_DIR, prep_folder)
+            os.makedirs(audio_prep_folder, exist_ok=True)
+            
+            scene_number = scene.get('scene_number', f'unknown_scene_{i+1}')
+            audio_filename = f"scene_{scene_number}.wav" # Local/Combined usually wav, EL is mp3 but we can rename
+            destination_audio_path = os.path.join(audio_prep_folder, audio_filename)
+            
+            if audio_path and os.path.exists(audio_path):
+                print(f"DEBUG: Moving audio for scene {i+1} from {audio_path} to {destination_audio_path}")
+                shutil.move(audio_path, destination_audio_path)
+                audio_paths.append(destination_audio_path)
+                print(f"DEBUG: Audio for scene {i+1} moved and appended.")
+            else:
+                 print(f"Warning: Audio path invalid for scene {scene_number}.")
+
+        except Exception as e:
+            print(f"Error generating speech for scene {i+1}: {e}")
+            # raise e # or skip
+
 
     print("DEBUG: Speech generation loop complete.") # DEBUG
 
-    # TODO: Only do this in development
-    print("DEBUG: Calling unload_tortoise...") # DEBUG
-    await unload_tortoise()
-    print("DEBUG: unload_tortoise complete.") # DEBUG
+
 
     # Create a combined audio file
     print("DEBUG: Combining audio files...")
