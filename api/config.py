@@ -10,13 +10,13 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     
     # Provider Selection (openai, ollama, elevenlabs, local_tts, flux, etc.)
-    ai_provider_script: str = "openai"
-    ai_provider_image: str = "openai"
-    ai_provider_voice: str = "elevenlabs"
+    ai_provider_script: str = "ollama"
+    ai_provider_image: str = "flux"
+    ai_provider_voice: str = "local_tts"
 
     # Local/Alternative Provider Settings
     ollama_base_url: str = "http://ollama:11434"
-    ollama_model: str = "llama3"
+    ollama_model: str = "gemma3:27b"
     
     flux_api_url: str = "http://flux:8000"
     
