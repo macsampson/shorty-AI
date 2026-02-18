@@ -41,5 +41,6 @@
       "Bash(node_modules.bintsc:*)",
       "Bash(del \"O:\\\\dev\\\\shorty-AI\\\\tests\\\\test_single_gpu_logic.py\")"
     ]
-  }
+  },
+  "outputStyle": "Explanatory"
 }

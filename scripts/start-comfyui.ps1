@@ -9,4 +9,6 @@ Set-Location $ComfyUIPath
 
 conda activate shorty-ai
 pip install -r requirements.txt
-python main.py --enable-manager
+pip install triton-windows
+pip install sageattention
+python main.py --enable-manager --use-sage-attention

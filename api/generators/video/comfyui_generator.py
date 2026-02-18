@@ -13,11 +13,13 @@ from api.config import settings
 class ComfyUIVideoGenerator(VideoGenerator):
     def __init__(self):
         self.base_url = settings.comfyui_base_url
-        self.workflow_template_path = "comfyui_workflows/video_ltx2_t2v_distilled_api.json"
+        self.workflow_template_path = (
+            "comfyui_workflows/video_ltx2_t2v_distilled_api.json"
+        )
 
     def _load_workflow_template(self) -> dict:
         """Load and return the ComfyUI workflow JSON template"""
-        with open(self.workflow_template_path, 'r', encoding='utf-8') as f:
+        with open(self.workflow_template_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def _inject_prompt(self, workflow: dict, prompt: str) -> dict:
@@ -28,19 +30,28 @@ class ComfyUIVideoGenerator(VideoGenerator):
                 break
         return workflow
 
-    def _configure_workflow(self, workflow: dict, frame_count: Optional[int] = None) -> dict:
+    def _configure_workflow(
+        self, workflow: dict, frame_count: Optional[int] = None
+    ) -> dict:
         """Configure workflow settings: frame count, seed, resolution"""
         seed1 = random.randint(0, 2**32 - 1)
         seed2 = random.randint(0, 2**32 - 1)
 
-        raw = frame_count if frame_count is not None else getattr(settings, "vidigen_frame_count", 97)
+        raw = (
+            frame_count
+            if frame_count is not None
+            else getattr(settings, "vidigen_frame_count", 97)
+        )
         # LTX-2 requires frame count = 8n + 1; snap to nearest valid value
         effective_frame_count = ((raw - 1) // 8) * 8 + 1
 
         for node_id, node in workflow.items():
             class_type = node.get("class_type")
 
-            if class_type == "PrimitiveInt" and node.get("_meta", {}).get("title") == "Frame Count":
+            if (
+                class_type == "PrimitiveInt"
+                and node.get("_meta", {}).get("title") == "Frame Count"
+            ):
                 node["inputs"]["value"] = effective_frame_count
 
             elif class_type == "RandomNoise":
@@ -56,7 +67,7 @@ class ComfyUIVideoGenerator(VideoGenerator):
         prompt: str,
         output_dir: str,
         progress_callback: Optional[Callable[[float], None]] = None,
-        frame_count: Optional[int] = None
+        frame_count: Optional[int] = None,
     ) -> str:
         """Generate video using ComfyUI with LTX-2"""
 
@@ -69,14 +80,10 @@ class ComfyUIVideoGenerator(VideoGenerator):
         timeout = aiohttp.ClientTimeout(total=60)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             # Submit prompt to ComfyUI
-            prompt_payload = {
-                "prompt": workflow,
-                "client_id": client_id
-            }
+            prompt_payload = {"prompt": workflow, "client_id": client_id}
 
             async with session.post(
-                f"{self.base_url}/prompt",
-                json=prompt_payload
+                f"{self.base_url}/prompt", json=prompt_payload
             ) as response:
                 if response.status != 200:
                     error_body = await response.text()
@@ -89,10 +96,7 @@ class ComfyUIVideoGenerator(VideoGenerator):
 
         # Monitor via polling (robust) + optional WebSocket progress
         video_path = await self._poll_for_completion(
-            prompt_id,
-            client_id,
-            output_dir,
-            progress_callback
+            prompt_id, client_id, output_dir, progress_callback
         )
 
         if settings.single_gpu_mode:
@@ -134,12 +138,16 @@ class ComfyUIVideoGenerator(VideoGenerator):
 
                     if queue_status == "running":
                         if elapsed % 30 < poll_interval:
-                            print(f"[ComfyUI] Still generating... ({int(elapsed)}s elapsed)")
+                            print(
+                                f"[ComfyUI] Still generating... ({int(elapsed)}s elapsed)"
+                            )
                         continue
 
                     if queue_status == "pending":
                         if elapsed % 30 < poll_interval:
-                            print(f"[ComfyUI] Queued, waiting... ({int(elapsed)}s elapsed)")
+                            print(
+                                f"[ComfyUI] Queued, waiting... ({int(elapsed)}s elapsed)"
+                            )
                         continue
 
                     # Not in queue — check history for results
@@ -178,9 +186,7 @@ class ComfyUIVideoGenerator(VideoGenerator):
             except (asyncio.CancelledError, Exception):
                 pass
 
-    async def _check_queue(
-        self, session: aiohttp.ClientSession, prompt_id: str
-    ) -> str:
+    async def _check_queue(self, session: aiohttp.ClientSession, prompt_id: str) -> str:
         """
         Check ComfyUI queue for our prompt.
         Returns: 'running', 'pending', or 'not_found'
@@ -210,7 +216,7 @@ class ComfyUIVideoGenerator(VideoGenerator):
         self,
         client_id: str,
         prompt_id: str,
-        progress_callback: Optional[Callable[[float], None]]
+        progress_callback: Optional[Callable[[float], None]],
     ):
         """
         Best-effort WebSocket listener for real-time progress updates.
@@ -258,10 +264,7 @@ class ComfyUIVideoGenerator(VideoGenerator):
             print(f"[ComfyUI WS] Progress listener error (non-fatal): {e}")
 
     async def _get_output_from_history(
-        self,
-        session: aiohttp.ClientSession,
-        prompt_id: str,
-        output_dir: str
+        self, session: aiohttp.ClientSession, prompt_id: str, output_dir: str
     ) -> Optional[str]:
         """Fetch output from ComfyUI history API"""
         try:
@@ -295,9 +298,7 @@ class ComfyUIVideoGenerator(VideoGenerator):
                             subfolder,
                             output_filename,
                         )
-                        dest_path = os.path.join(
-                            output_dir, f"video_{prompt_id}.mp4"
-                        )
+                        dest_path = os.path.join(output_dir, f"video_{prompt_id}.mp4")
 
                         shutil.copy2(source_path, dest_path)
                         return dest_path
@@ -314,7 +315,7 @@ class ComfyUIVideoGenerator(VideoGenerator):
             try:
                 await session.post(
                     f"{self.base_url}/free",
-                    json={"unload_models": True, "free_memory": True}
+                    json={"unload_models": True, "free_memory": True},
                 )
                 await asyncio.sleep(2)
             except:
