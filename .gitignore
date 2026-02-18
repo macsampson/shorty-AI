@@ -15,6 +15,7 @@ generations
 testing
 */images
 
+
 # ignore caches
 **/__pycache__
 
@@ -24,6 +25,7 @@ testing
 
 # any model files
 models
+/flux
 
 # env
 .env

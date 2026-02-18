@@ -13,7 +13,7 @@ const VideoDetails: React.FC<VideoDetailsProps> = ({
   generatedContent,
   videoGenerating,
 }) => {
-  const [isScriptMediaExpanded, setIsScriptMediaExpanded] = useState(false)
+  const [isMetadataExpanded, setIsMetadataExpanded] = useState(false)
 
   if (videoGenerating) {
     return (
@@ -37,10 +37,11 @@ const VideoDetails: React.FC<VideoDetailsProps> = ({
 
   const hasVideo =
     generatedContent.video_urls && generatedContent.video_urls.length > 0
+  const metadata = generatedContent.script || {}
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Video section - shown first */}
+      {/* Video section */}
       {hasVideo && (
         <div className="bg-white rounded-lg p-4 md:p-6 shadow-md flex flex-col items-center max-w-full overflow-hidden relative video-ready">
           <h3 className="text-xl font-semibold text-primary self-start mb-4">
@@ -73,68 +74,59 @@ const VideoDetails: React.FC<VideoDetailsProps> = ({
         </div>
       )}
 
-      {/* Collapsible container for script and media */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div
-          className="flex justify-between items-center p-4 md:p-6 cursor-pointer bg-gray-50 border-b border-gray-200 transition-colors hover:bg-gray-100"
-          onClick={() => setIsScriptMediaExpanded(!isScriptMediaExpanded)}
-        >
-          <h3 className="text-lg font-medium text-primary m-0">
-            Script & Media
-          </h3>
-          <span
-            className="text-sm transition-transform duration-300"
-            style={{
-              transform: isScriptMediaExpanded
-                ? "rotate(0deg)"
-                : "rotate(-90deg)",
-            }}
+      {/* Collapsible metadata */}
+      {Object.keys(metadata).length > 0 && (
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div
+            className="flex justify-between items-center p-4 md:p-6 cursor-pointer bg-gray-50 border-b border-gray-200 transition-colors hover:bg-gray-100"
+            onClick={() => setIsMetadataExpanded(!isMetadataExpanded)}
           >
-            ▼
-          </span>
-        </div>
-        {isScriptMediaExpanded && (
-          <div className="animate-fadeIn">
-            <div className="p-4 md:p-6 border-b border-gray-100">
-              <h4 className="text-base font-medium text-primary mb-4">
-                Script: {generatedContent.script.title}
-              </h4>
-              {generatedContent.script.scenes.map((scene) => (
-                <div
-                  key={scene.scene_number}
-                  className="mb-4 pb-4 border-b border-gray-100 last:mb-0 last:pb-0 last:border-0"
-                >
-                  <div className="font-semibold text-primary mb-2">
-                    Scene {scene.scene_number}
-                  </div>
-                  <div className="text-gray-700">{scene.script}</div>
+            <h3 className="text-lg font-medium text-primary m-0">
+              Generation Details
+            </h3>
+            <span
+              className="text-sm transition-transform duration-300"
+              style={{
+                transform: isMetadataExpanded
+                  ? "rotate(0deg)"
+                  : "rotate(-90deg)",
+              }}
+            >
+              ▼
+            </span>
+          </div>
+          {isMetadataExpanded && (
+            <div className="animate-fadeIn p-4 md:p-6">
+              {metadata.original_prompt && (
+                <div className="mb-4">
+                  <div className="font-semibold text-gray-700 mb-1">Prompt</div>
+                  <div className="text-gray-600">{metadata.original_prompt}</div>
                 </div>
-              ))}
-            </div>
-
-            <div className="p-4 md:p-6">
-              <h4 className="text-base font-medium text-primary mb-4">Media</h4>
-
-              {generatedContent.image_urls.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {generatedContent.image_urls.map((url, index) => (
-                    <div
-                      key={index}
-                      className="rounded overflow-hidden"
-                    >
-                      <img
-                        src={`http://localhost:8000${url}`}
-                        alt={`Scene ${index + 1}`}
-                        className="w-full h-auto block"
-                      />
-                    </div>
-                  ))}
+              )}
+              {metadata.expanded_prompt && (
+                <div className="mb-4">
+                  <div className="font-semibold text-gray-700 mb-1">Expanded Prompt</div>
+                  <div className="text-gray-600">{metadata.expanded_prompt}</div>
+                </div>
+              )}
+              {metadata.word_count !== undefined && (
+                <div className="mb-4">
+                  <div className="font-semibold text-gray-700 mb-1">Captions</div>
+                  <div className="text-gray-600">{metadata.word_count} words extracted</div>
+                </div>
+              )}
+              {metadata.created_at && (
+                <div className="mb-2">
+                  <div className="font-semibold text-gray-700 mb-1">Created</div>
+                  <div className="text-gray-600">
+                    {new Date(metadata.created_at).toLocaleString()}
+                  </div>
                 </div>
               )}
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

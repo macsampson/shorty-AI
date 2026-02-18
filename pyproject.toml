@@ -1,0 +1,22 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "smoke: service connectivity checks (require running services)",
+    "slow: tests that take more than a few seconds",
+    "gpu: tests that require a GPU",
+]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["api"]
+omit = [
+    # Legacy Shorty AI files (pipeline removed)
+    "api/generators/caption_overlay.py",
+    "api/generators/subtitle_creator.py",
+    "api/schemas/generate_image_request.py",
+    "api/schemas/generate_speech_request.py",
+]
+
+[tool.coverage.report]
+fail_under = 60
+show_missing = true

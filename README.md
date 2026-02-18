@@ -1,6 +1,6 @@
-# Shorty AI
+# Apparition.io
 
-**Shorty AI** is an automated short-form video generator that transforms text prompts into complete video productions. It orchestrates a suite of AI models for scriptwriting, image generation, voice synthesis, and video assembly, making it easy to create content for platforms like YouTube Shorts, TikTok, and Instagram Reels.
+**Apparition.io** is an automated short-form video generator that transforms text prompts into complete video productions. It orchestrates a suite of AI models for scriptwriting, image generation, voice synthesis, and video assembly, making it easy to create content for platforms like YouTube Shorts, TikTok, and Instagram Reels.
 
 ![Demo](https://github.com/macsampson/ai-shorts/blob/main/frontend/public/shorty_example.gif)
 
@@ -14,7 +14,7 @@
 
 ## Authorization
 
-Shorty AI is built with a modular architecture:
+Apparition.io is built with a modular architecture:
 
 - **Frontend**: React (TypeScript, TailwindCSS) - User interface for prompts and previews.
 - **Backend**: FastAPI (Python) - Orchestrator for AI services and video processing.
@@ -35,6 +35,7 @@ Before you begin, ensure you have the following installed:
 ## Installation
 
 1.  **Clone the repository:**
+
     ```bash
     git clone https://github.com/macsampson/ai-shorts.git
     cd ai-shorts
@@ -42,10 +43,13 @@ Before you begin, ensure you have the following installed:
 
 2.  **Configure Environment Variables:**
     Copy the example environment file and update it with your API keys.
+
     ```bash
     cp .env.example .env
     ```
+
     Open `.env` and fill in your keys:
+
     ```env
     OPENAI_API_KEY=your_openai_key
     ELEVENLABS_API_KEY=your_elevenlabs_key
@@ -55,13 +59,22 @@ Before you begin, ensure you have the following installed:
     ```bash
     docker-compose up --build
     ```
-    *Note: This may take a while initially as it builds the containers and downloads necessary models (Ollama, Flux).*
+    _Note: This may take a while initially as it builds the containers and downloads necessary models (Ollama, Flux)._
+
+## Local Models Setup
+
+To use local AI providers, you need to place your model files in the `models/` directory:
+
+- **Flux (Image)**: Place your Flux model files (e.g., `flux1-schnell.sft`, `ae.sft`) in `models/flux/`.
+- **Ollama (Script)**: Ollama will automatically pull models to `models/ollama/` when the container starts for the first time.
+- **Coqui TTS (Voice)**: Place your TTS model files (e.g., `tts_models/en/ljspeech/glow-tts`) in `models/tts/`.
 
 ## Configuration
 
 The application is configured via environment variables in `.env` and `api/config.py`.
 
 ### AI Providers
+
 You can switch between providers by modifying `api/config.py` or setting environment variables (if supported by `api/config.py` logic, currently hardcoded in `factory.py` based on `config.py` settings).
 
 - **Script**: OpenAI / Ollama
@@ -69,6 +82,7 @@ You can switch between providers by modifying `api/config.py` or setting environ
 - **Voice**: ElevenLabs / Local TTS
 
 ### Local Models (Ollama & Flux)
+
 To use local models, ensure the `ollama` and `flux` services are running in Docker. The API is pre-configured to communicate with them via the internal Docker network.
 
 ## Usage

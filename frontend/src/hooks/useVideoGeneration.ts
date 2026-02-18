@@ -2,6 +2,12 @@ import { useState, useRef, useEffect } from "react"
 import axios from "axios"
 import { GeneratedContent } from "../types"
 
+interface ProgressUpdate {
+  progress: number
+  stage: string
+  message: string
+}
+
 export const useVideoGeneration = (
   selectedFolder: string,
   setGeneratedContent: (content: GeneratedContent) => void
@@ -10,106 +16,118 @@ export const useVideoGeneration = (
   const [videoGenerating, setVideoGenerating] = useState<boolean>(false)
   const [prompt, setPrompt] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
+  const [expandedPrompt, setExpandedPrompt] = useState<string>("")
+  const [expanding, setExpanding] = useState<boolean>(false)
+  const [durationSeconds, setDurationSeconds] = useState<number>(5)
 
-  // Ref to store the interval ID
-  const videoCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  // WebSocket progress tracking
+  const [progress, setProgress] = useState<number>(0)
+  const [currentStage, setCurrentStage] = useState<string>("")
+  const [statusMessage, setStatusMessage] = useState<string>("")
 
-  // Clean up the interval on component unmount
+  // Ref to store WebSocket connection
+  const wsRef = useRef<WebSocket | null>(null)
+
+  // Clean up on component unmount
   useEffect(() => {
     return () => {
-      if (videoCheckIntervalRef.current) {
-        clearInterval(videoCheckIntervalRef.current)
-        videoCheckIntervalRef.current = null
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
       }
     }
   }, [])
 
-  useEffect(() => {
-    // If video is generating, start checking for it
-    if (videoGenerating && selectedFolder) {
-      startVideoCheckInterval()
-    } else if (!videoGenerating && videoCheckIntervalRef.current) {
-      // If video is no longer generating, clear the interval
-      clearInterval(videoCheckIntervalRef.current)
-      videoCheckIntervalRef.current = null
-    }
-  }, [videoGenerating, selectedFolder])
+  // WebSocket connection for VidiGen pipeline
+  const connectWebSocket = (jobId: string) => {
+    const ws = new WebSocket(`ws://localhost:8000/ws/video_generation/${jobId}`)
 
-  // Function to start checking for video generation
-  const startVideoCheckInterval = () => {
-    // Clear any existing interval
-    if (videoCheckIntervalRef.current) {
-      clearInterval(videoCheckIntervalRef.current)
-      videoCheckIntervalRef.current = null
+    ws.onopen = () => {
+      console.log("WebSocket connected")
     }
 
-    // Set up a new interval to check for the video
-    videoCheckIntervalRef.current = setInterval(async () => {
-      try {
-        // Fetch the latest folders
-        const response = await axios.get(
-          "http://localhost:8000/list_generated_content"
-        )
-        const latestFolders = response.data.folders
+    ws.onmessage = (event) => {
+      const data: ProgressUpdate = JSON.parse(event.data)
 
-        // If we have a selected folder, check if it has a video
-        if (selectedFolder && latestFolders.includes(selectedFolder)) {
-          const contentResponse = await axios.get(
-            `http://localhost:8000/get_generated_content/${selectedFolder}`
-          )
+      setProgress(data.progress)
+      setCurrentStage(data.stage)
+      setStatusMessage(data.message)
 
-          // If the folder has a video, update the content and stop checking
-          if (
-            contentResponse.data.video_urls &&
-            contentResponse.data.video_urls.length > 0
-          ) {
-            setGeneratedContent(contentResponse.data)
-            setVideoGenerating(false)
-
-            // Clear the interval
-            if (videoCheckIntervalRef.current) {
-              clearInterval(videoCheckIntervalRef.current)
-              videoCheckIntervalRef.current = null
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error checking for video:", error)
-        // Don't keep polling on repeated errors
-        if (videoCheckIntervalRef.current) {
-          clearInterval(videoCheckIntervalRef.current)
-          videoCheckIntervalRef.current = null
-        }
+      if (data.stage === "complete") {
+        setLoading(false)
+        setVideoGenerating(false)
+        ws.close()
+        // Refresh video library
+        window.location.reload()
+      } else if (data.stage === "error") {
+        setError(data.message)
+        setLoading(false)
+        setVideoGenerating(false)
+        ws.close()
       }
-    }, 5000) // Check every 5 seconds
+    }
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error)
+      setError("Real-time connection failed")
+      setLoading(false)
+      setVideoGenerating(false)
+    }
+
+    ws.onclose = () => {
+      console.log("WebSocket closed")
+    }
+
+    wsRef.current = ws
+  }
+
+  const handleExpand = async () => {
+    if (!prompt) return
+    setExpanding(true)
+    setExpandedPrompt("")
+    setError(null)
+    try {
+      const response = await axios.post("http://localhost:8000/expand_prompt", { prompt })
+      setExpandedPrompt(response.data.expanded)
+    } catch (err) {
+      console.error("Error expanding prompt:", err)
+      setError("Failed to expand prompt.")
+    } finally {
+      setExpanding(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setProgress(0)
+    setCurrentStage("")
+    setStatusMessage("")
 
     try {
-      // Call the generate_video endpoint
-      await axios.post("http://localhost:8000/generate_video", {
-        prompt: prompt,
-      })
+      // Use expanded prompt if available, otherwise use raw prompt
+      const finalPrompt = expandedPrompt || prompt
+      const response = await axios.post(
+        "http://localhost:8000/generate_video_vidigen",
+        { prompt: finalPrompt, duration_seconds: durationSeconds }
+      )
 
-      // Start checking for the video
+      const { job_id } = response.data
+      connectWebSocket(job_id)
       setVideoGenerating(true)
 
-      // Clear the prompt
+      // Clear the prompt and expanded prompt
       setPrompt("")
+      setExpandedPrompt("")
 
-      // Return success
       return true
     } catch (error) {
       console.error("Error generating content:", error)
       setError("Failed to generate content. Please try again.")
       return false
-    } finally {
-      setLoading(false)
     }
+    // Loading stays true until WebSocket reports completion
   }
 
   return {
@@ -117,8 +135,16 @@ export const useVideoGeneration = (
     videoGenerating,
     prompt,
     error,
+    progress,
+    currentStage,
+    statusMessage,
+    expandedPrompt,
+    expanding,
+    durationSeconds,
     setPrompt,
     setVideoGenerating,
+    setDurationSeconds,
     handleSubmit,
+    handleExpand,
   }
 }

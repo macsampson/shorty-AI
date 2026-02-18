@@ -99,10 +99,10 @@ export const useFolders = () => {
             { timeout: 5000 }
           )
 
-          if (response.data.image_urls && response.data.image_urls.length > 0) {
+          if (response.data.video_urls && response.data.video_urls.length > 0) {
             thumbnails[
               folder
-            ] = `http://localhost:8000${response.data.image_urls[0]}`
+            ] = `http://localhost:8000${response.data.video_urls[0]}`
 
             // Update thumbnails state incrementally as they load
             setFolderThumbnails((prev) => ({
@@ -136,11 +136,11 @@ export const useFolders = () => {
 
       setGeneratedContent(response.data)
 
-      // If we have images, update the thumbnail cache
-      if (response.data.image_urls && response.data.image_urls.length > 0) {
+      // If we have videos, update the thumbnail cache
+      if (response.data.video_urls && response.data.video_urls.length > 0) {
         setFolderThumbnails((prev) => ({
           ...prev,
-          [folder]: `http://localhost:8000${response.data.image_urls[0]}`,
+          [folder]: `http://localhost:8000${response.data.video_urls[0]}`,
         }))
       }
 
@@ -158,13 +158,13 @@ export const useFolders = () => {
       return folderThumbnails[folder]
     }
 
-    // If this is the selected folder and we have content, use the first image
+    // If this is the selected folder and we have content, use the first video
     if (
       selectedFolder === folder &&
       generatedContent &&
-      generatedContent.image_urls.length > 0
+      generatedContent.video_urls.length > 0
     ) {
-      const thumbnailUrl = `http://localhost:8000${generatedContent.image_urls[0]}`
+      const thumbnailUrl = `http://localhost:8000${generatedContent.video_urls[0]}`
 
       // Cache this thumbnail for future use
       setFolderThumbnails((prev) => ({

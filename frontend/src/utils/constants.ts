@@ -23,17 +23,3 @@ export const borderRadius = {
   medium: "8px",
   large: "12px",
 }
-
-// Default settings
-export const DEFAULT_SETTINGS = {
-  num_scenes: 5,
-  scene_duration: 5,
-  voice: "train_atkins",
-  tts_preset: "ultra_fast",
-  caption_words_per_line: 5,
-  caption_max_lines: 2,
-  caption_style: "modern",
-  caption_highlight_color: "#00FF7F",
-  caption_normal_color: "#FFFFFF",
-  max_retries: 3,
-}

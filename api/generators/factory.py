@@ -1,45 +1,22 @@
-from api.config import settings
-from api.generators.base import ScriptGenerator, ImageGenerator, VoiceGenerator
+from api.generators.base import PromptExpansionGenerator, VideoGenerator, CaptionGenerator
 
-# Script Generators
-from api.generators.script.openai_generator import OpenAIScriptGenerator
-from api.generators.script.ollama_generator import OllamaScriptGenerator
-
-# Image Generators
-from api.generators.image.openai_generator import OpenAIImageGenerator
-from api.generators.image.flux_generator import FluxImageGenerator
-
-# Voice Generators
-from api.generators.voice.elevenlabs_generator import ElevenLabsVoiceGenerator
-from api.generators.voice.local_generator import LocalVoiceGenerator
+# VidiGen Generators
+from api.generators.prompt.ollama_expander import OllamaPromptExpander
+from api.generators.video.comfyui_generator import ComfyUIVideoGenerator
+from api.generators.caption.whisper_generator import WhisperCaptionGenerator
 
 class GeneratorFactory:
     @staticmethod
-    def get_script_generator() -> ScriptGenerator:
-        provider = settings.ai_provider_script.lower()
-        if provider == "openai":
-            return OpenAIScriptGenerator()
-        elif provider == "ollama":
-            return OllamaScriptGenerator()
-        else:
-            raise ValueError(f"Unknown script provider: {provider}")
+    def get_prompt_expander() -> PromptExpansionGenerator:
+        """Get prompt expansion generator (currently only Ollama)"""
+        return OllamaPromptExpander()
 
     @staticmethod
-    def get_image_generator() -> ImageGenerator:
-        provider = settings.ai_provider_image.lower()
-        if provider == "openai":
-            return OpenAIImageGenerator()
-        elif provider == "flux":
-            return FluxImageGenerator()
-        else:
-            raise ValueError(f"Unknown image provider: {provider}")
+    def get_video_generator() -> VideoGenerator:
+        """Get video generator (currently only ComfyUI/LTX-2)"""
+        return ComfyUIVideoGenerator()
 
     @staticmethod
-    def get_voice_generator() -> VoiceGenerator:
-        provider = settings.ai_provider_voice.lower()
-        if provider == "elevenlabs":
-            return ElevenLabsVoiceGenerator()
-        elif provider == "local_tts":
-            return LocalVoiceGenerator()
-        else:
-            raise ValueError(f"Unknown voice provider: {provider}")
+    def get_caption_generator() -> CaptionGenerator:
+        """Get caption generator (currently only Whisper)"""
+        return WhisperCaptionGenerator()

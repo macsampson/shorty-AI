@@ -86,10 +86,23 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({
                 >
                   <div className="relative w-full pt-[56.25%] overflow-hidden">
                     {getThumbnailForFolder(folder) ? (
-                      <img
+                      <video
                         src={getThumbnailForFolder(folder) || ""}
-                        alt={formatFolderTitle(folder)}
+                        muted
+                        playsInline
+                        loop
+                        preload="metadata"
                         onError={() => handleThumbnailError(folder)}
+                        onMouseEnter={(e) => {
+                          const video = e.currentTarget
+                          video.currentTime = 0
+                          video.play().catch(() => {})
+                        }}
+                        onMouseLeave={(e) => {
+                          const video = e.currentTarget
+                          video.pause()
+                          video.currentTime = 0
+                        }}
                         className="absolute top-0 left-0 w-full h-full object-cover"
                       />
                     ) : (

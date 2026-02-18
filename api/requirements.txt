@@ -7,8 +7,18 @@ uvicorn
 aiohttp
 requests
 ffmpeg
-aeneas
+numpy
+# aeneas installed separately (requires numpy at build time, needs --no-build-isolation)
 stable-ts
 torch
 openai
 pydantic-settings
+
+# WebSocket support for VidiGen
+websockets
+
+# Whisper for transcription (VidiGen pipeline)
+openai-whisper
+
+# Video processing (1.x required - 2.x removed moviepy.editor)
+moviepy==1.0.3

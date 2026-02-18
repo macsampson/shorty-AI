@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from "react"
-// CSS imports
-// import "./App.css"
-// import "./styles/animations.css"
-// import "./styles/settings.css"
 import "./styles/tailwind.css"
 
 // Import hooks
-import { useSettings, useFolders, useVideoGeneration } from "./hooks"
+import { useFolders, useVideoGeneration } from "./hooks"
 
 // Import components
 import { Header, VideoForm, VideoLibrary, VideoDetails } from "./components"
@@ -15,16 +11,6 @@ import { Header, VideoForm, VideoLibrary, VideoDetails } from "./components"
 import { WindowSize } from "./types"
 
 function App() {
-  // Initialize hooks
-  const {
-    settings,
-    voices,
-    ttsPresets,
-    captionStyles,
-    captionStyleDescriptions,
-    updateSetting,
-  } = useSettings()
-
   const {
     folders,
     selectedFolder,
@@ -50,9 +36,17 @@ function App() {
     videoGenerating,
     prompt,
     error: videoError,
+    progress,
+    currentStage,
+    statusMessage,
+    expandedPrompt,
+    expanding,
+    durationSeconds,
     setPrompt,
     setVideoGenerating,
+    setDurationSeconds,
     handleSubmit,
+    handleExpand,
   } = useVideoGeneration(selectedFolder, setGeneratedContent)
 
   // Active tab state
@@ -83,19 +77,15 @@ function App() {
         generatedContent.video_urls.length > 0
       )
     }
-    // For non-selected folders, we don't know, so assume they do
     return true
   }
 
   // Handle successful video generation
   const handleVideoGenerated = async () => {
-    // Fetch the updated list of folders
     const updatedFolders = await fetchFolders()
 
-    // Automatically select the most recent folder (which should be the first one in the sorted list)
     if (updatedFolders && updatedFolders.length > 0) {
       handleFolderSelect(updatedFolders[0])
-      // Switch to the details tab to show the new video
       setActiveTab("details")
     }
   }
@@ -108,25 +98,19 @@ function App() {
         height: window.innerHeight,
       }
 
-      // Check if we're crossing a breakpoint that would change itemsPerPage
       const oldItemsPerPage = getItemsPerPage()
       setWindowSize(newSize)
       const newItemsPerPage = getItemsPerPage()
 
-      // If items per page changed, adjust current page to keep items in view
       if (oldItemsPerPage !== newItemsPerPage && folders.length > 0) {
-        // Calculate the first item index on the current page
         const firstItemIndex = (currentPage - 1) * oldItemsPerPage
-        // Calculate which page that item would be on with the new items per page
         const newPage = Math.floor(firstItemIndex / newItemsPerPage) + 1
-        // Set the new page
         setCurrentPage(newPage)
       }
     }
 
     window.addEventListener("resize", handleResize)
 
-    // Clean up
     return () => {
       window.removeEventListener("resize", handleResize)
     }
@@ -149,15 +133,17 @@ function App() {
           prompt={prompt}
           setPrompt={setPrompt}
           handleSubmit={handleVideoSubmit}
+          handleExpand={handleExpand}
           loading={loading}
           videoGenerating={videoGenerating}
+          expanding={expanding}
+          expandedPrompt={expandedPrompt}
           error={videoError}
-          settings={settings}
-          voices={voices}
-          ttsPresets={ttsPresets}
-          updateSetting={updateSetting}
-          captionStyles={captionStyles}
-          captionStyleDescriptions={captionStyleDescriptions}
+          progress={progress}
+          currentStage={currentStage}
+          statusMessage={statusMessage}
+          durationSeconds={durationSeconds}
+          setDurationSeconds={setDurationSeconds}
         />
 
         <div className="w-full bg-white rounded-lg shadow-md p-4 md:p-6">
@@ -170,7 +156,7 @@ function App() {
               }`}
               onClick={() => {
                 setActiveTab("library")
-                setCurrentPage(1) // Reset to first page when switching to library
+                setCurrentPage(1)
               }}
             >
               Video Library
@@ -217,7 +203,7 @@ function App() {
         </div>
 
         <footer className="w-full text-center py-4 text-gray-500 text-sm mt-auto">
-          <p>© 2023 Shorty AI • AI-powered video generation</p>
+          <p>apparition.io</p>
         </footer>
       </div>
     </div>
